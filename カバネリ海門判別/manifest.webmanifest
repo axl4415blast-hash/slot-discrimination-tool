@@ -1,0 +1,12 @@
+{
+  "name": "カバネリ カウンター",
+  "short_name": "カバネリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16181C",
+  "theme_color": "#16181C",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
