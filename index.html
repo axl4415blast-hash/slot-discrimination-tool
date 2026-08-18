@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12141A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ベース計算 - ジャグラー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --bg:#12141A; --panel:#1C1F27; --panel2:#242833; --line:#333846;
+  --fg:#E8EAED; --muted:#8B909C; --warn:#E5484D; --ok:#4CC38A;
+  --s1:#3D5A80; --s2:#4E6E8E; --s3:#6B7F8C; --s4:#A88948; --s5:#D19E3D; --s6:#F4B333;
+  --num:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui)}
+body{padding:env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 24px);max-width:520px;margin:0 auto;font-size:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+h2{font-size:12px;letter-spacing:.14em;color:var(--muted);margin:0 0 10px;font-weight:600}
+button{font-family:var(--ui);font-size:16px;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer}
+button:active{background:#2E3342}
+button:focus-visible{outline:2px solid var(--s6);outline-offset:2px}
+input,select{font-family:var(--num);font-size:20px;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;text-align:right;font-variant-numeric:tabular-nums}
+select{font-family:var(--ui);text-align:left;font-size:17px}
+input:focus,select:focus{outline:2px solid var(--s6);outline-offset:1px}
+
+/* ---- readout ---- */
+#readout{text-align:center;padding:20px 14px 16px}
+#big{font-family:var(--num);font-size:76px;line-height:.95;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+#bigUnit{font-size:15px;color:var(--muted);margin-top:6px;letter-spacing:.08em}
+#range{font-family:var(--num);font-size:24px;color:var(--fg);margin-top:14px;font-variant-numeric:tabular-nums}
+#rangeLabel{font-size:11px;color:var(--muted);letter-spacing:.1em;margin-top:4px}
+#verdict{font-size:22px;font-weight:700;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+#conf{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+.err #big{color:var(--warn);font-size:34px;letter-spacing:0}
+.err #range,.err #rangeLabel,.err #bigUnit{display:none}
+
+/* ---- ladder ---- */
+.lad{position:relative;margin-top:4px;padding-bottom:22px}
+.row{display:grid;grid-template-columns:44px 62px 1fr;align-items:center;gap:8px;height:34px;position:relative;z-index:2}
+.row b{font-size:13px;font-weight:600;color:var(--muted)}
+.row i{font-family:var(--num);font-size:15px;font-style:normal;font-variant-numeric:tabular-nums;text-align:right}
+.track{position:relative;height:8px;background:#232733;border-radius:4px;overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+#band{position:absolute;top:0;bottom:22px;min-width:2px;background:rgba(244,179,51,.16);border-left:2px solid var(--s6);border-right:2px solid var(--s6);z-index:1;pointer-events:none;border-radius:2px}
+#bandMark{position:absolute;bottom:0;height:20px;font-family:var(--num);font-size:11px;color:var(--s6);z-index:3;white-space:nowrap}
+
+/* ---- inputs ---- */
+.field{display:grid;grid-template-columns:1fr 118px;align-items:center;gap:10px;margin-bottom:10px}
+.field label{font-size:15px;color:var(--fg)}
+.field label small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.count{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.cbox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.cbox .lbl{font-size:12px;color:var(--muted);letter-spacing:.1em}
+.cbox .val{font-family:var(--num);font-size:40px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.cbtn{display:grid;grid-template-columns:1fr 2fr;gap:6px;margin-top:8px}
+.cbtn button{padding:14px 0;font-size:20px;font-weight:700}
+.cbtn .plus{background:#2C3242}
+.quick{display:flex;gap:6px;margin:-4px 0 12px}
+.quick button{flex:1;padding:9px 0;font-size:14px;color:var(--muted)}
+details{margin:10px 0}
+summary{list-style:none;cursor:pointer;font-size:13px;color:var(--muted);letter-spacing:.1em;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";}
+details[open] summary::before{content:"▾ ";}
+details[open] summary{border-radius:14px 14px 0 0;border-bottom:none}
+details .card{margin-top:0;border-radius:0 0 14px 14px}
+.note{font-size:12px;color:var(--muted);line-height:1.65;margin-top:10px}
+.meta{display:flex;justify-content:space-between;font-family:var(--num);font-size:13px;color:var(--muted);padding:5px 0;border-top:1px solid var(--line)}
+.meta:first-child{border-top:none}
+.wide{width:100%;padding:14px;margin-top:8px}
+.danger{color:var(--warn);border-color:#4A2427}
+#flash{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:var(--s6);color:#12141A;font-weight:700;font-size:14px;padding:10px 18px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="card" id="readout">
+  <div id="big">—</div>
+  <div id="bigUnit">50枚あたり回転数</div>
+  <div id="range">—</div>
+  <div id="rangeLabel">持ちメダル誤差を含む範囲</div>
+  <div id="verdict">機種と数値を入力</div>
+  <div id="conf"></div>
+</div>
+
+<div class="card">
+  <h2>設定比較</h2>
+  <div class="lad" id="ladder"></div>
+</div>
+
+<div class="card">
+  <h2>いま打っている台</h2>
+  <div class="count">
+    <div class="cbox">
+      <div class="lbl">BIG</div><div class="val" id="vBB">0</div>
+      <div class="cbtn"><button data-d="bb,-1">−</button><button class="plus" data-d="bb,1">＋</button></div>
+    </div>
+    <div class="cbox">
+      <div class="lbl">REG</div><div class="val" id="vRB">0</div>
+      <div class="cbtn"><button data-d="rb,-1">−</button><button class="plus" data-d="rb,1">＋</button></div>
+    </div>
+  </div>
+  <div class="field"><label>総回転数<small>データカウンターの数字</small></label><input id="nowG" type="number" inputmode="numeric" value="0"></div>
+  <div class="field"><label>持ちメダル<small>いま手元にある枚数</small></label><input id="nowHold" type="number" inputmode="numeric" value="0"></div>
+  <div class="quick">
+    <button data-h="-500">−500</button><button data-h="-100">−100</button>
+    <button data-h="100">+100</button><button data-h="500">+500</button><button data-h="1000">+1000</button>
+  </div>
+  <div class="field"><label>現金投資<small>サンドに入れた金額</small></label><input id="cash" type="number" inputmode="numeric" value="0"></div>
+  <div class="field"><label>貯メダル投資<small>使った貯メダルの枚数</small></label><input id="saved" type="number" inputmode="numeric" value="0"></div>
+</div>
+
+<details id="segDetails">
+  <summary>途中から座った場合</summary>
+  <div class="card">
+    <p class="note" style="margin-top:0">座った時点のカウンター値と、その時に持っていたメダル枚数を入れて「ここから記録開始」を押してください。以降は上の欄を更新するだけで、自分が回した区間だけが計算されます。</p>
+    <div class="field"><label>開始時の総回転数</label><input id="stG" type="number" inputmode="numeric" value="0"></div>
+    <div class="field"><label>開始時のBIG</label><input id="stBB" type="number" inputmode="numeric" value="0"></div>
+    <div class="field"><label>開始時のREG</label><input id="stRB" type="number" inputmode="numeric" value="0"></div>
+    <div class="field"><label>開始時の持ちメダル<small>他の台で出した分</small></label><input id="stHold" type="number" inputmode="numeric" value="0"></div>
+    <button class="wide" id="snap">いまの値をコピーして記録開始</button>
+  </div>
+</details>
+
+<details>
+  <summary>設定</summary>
+  <div class="card">
+    <div class="field" style="grid-template-columns:1fr"><label style="margin-bottom:6px">機種</label><select id="machine"></select></div>
+    <div class="field" style="grid-template-columns:1fr;margin-top:10px"><label style="margin-bottom:6px">打ち方<small>基準表は適当打ちの値です。選んだ打ち方の差を基準表に足して比較します。</small></label><select id="style"></select></div>
+    <div class="field" style="margin-top:10px"><label>打ち方の補正<small>手動で上書きできます</small></label><input id="offset" type="number" step="0.01" value="0.60"></div>
+    <div class="field"><label>貸出枚数<small>1000円あたり</small></label><input id="rate" type="number" inputmode="numeric" value="50"></div>
+    <div class="field"><label>持ちメダル誤差<small>範囲表示の幅（枚）</small></label><input id="errM" type="number" inputmode="numeric" value="100"></div>
+    <button class="wide danger" id="reset">すべての数値を0に戻す</button>
+  </div>
+</details>
+
+<details>
+  <summary>計算の内訳</summary>
+  <div class="card" id="breakdown"></div>
+</details>
+
+<details>
+  <summary>この数値の読み方</summary>
+  <div class="card">
+    <p class="note" style="margin-top:0">
+    <b style="color:var(--fg)">この指標は単独で設定を決められません。</b>
+    持ちメダルの数え間違いが±100枚あると、5000回転時点でも結果が1.7回転前後ぶれます。マイジャグラーVなら設定1〜4がその幅に収まります。<br><br>
+    <b style="color:var(--fg)">合算確率・REG確率と必ず併用してください。</b>
+    5000回転時点で設定1と設定6を分ける力は、単独REG確率が最も強く、次に合算確率、その次にブドウ確率、この指標は最下位です。<br><br>
+    <b style="color:var(--fg)">基準表は適当打ちの値です。</b>
+    ネオアイムジャグラーで確認できた差（チェリー狙いで+0.57〜0.63、フル攻略で+1.35〜1.48）を全機種に当てはめています。他機種での差は未検証なので、実測とズレを感じたら設定画面で補正値を調整してください。<br><br>
+    <b style="color:var(--fg)">ボーナス中の回転数は自動で引いています。</b>
+    BIGは20回転（ネオアイムのみ21回転）、REGは8回転。データカウンターの総回転数をそのまま入れてください。
+    </p>
+  </div>
+</details>
+
+<div id="flash"></div>
+
+<script>
+"use strict";
+
+/* ===== 機種データ =====
+   g   : 設定1〜6の50枚あたり回転数（適当打ち基準）
+   bb  : BIG純増枚数 / bbG : BIG消化ゲーム数
+   REGは全機種 96枚 / 8G 固定
+   機種を追加する時はこの配列に1行足すだけ。 */
+const MACHINES = [
+  {name:"マイジャグラーV",        g:[42.62,42.97,43.41,43.95,43.97,44.96], bb:240, bbG:20},
+  {name:"ファンキージャグラー2",  g:[42.38,42.56,43.20,43.39,43.95,44.74], bb:240, bbG:20},
+  {name:"ゴーゴージャグラー3",    g:[40.25,40.59,41.01,41.25,41.91,42.39], bb:240, bbG:20},
+  {name:"ハッピージャグラー",     g:[41.76,42.01,42.27,43.43,43.67,43.90], bb:240, bbG:20},
+  {name:"ジャグラーガールズ",     g:[41.96,41.96,41.97,41.98,42.81,43.25], bb:240, bbG:20},
+  {name:"ネオアイムジャグラー",   g:[41.08,41.08,41.08,41.08,41.08,43.03], bb:252, bbG:21}
+];
+const REG_PAY = 96, REG_G = 8;
+
+const STYLES = [
+  {name:"適当打ち",     off:0.00},
+  {name:"チェリー狙い", off:0.60},
+  {name:"フル攻略",     off:1.40}
+];
+
+const SCOL = ["--s1","--s2","--s3","--s4","--s5","--s6"];
+const $ = id => document.getElementById(id);
+const NUM_IDS = ["nowG","nowHold","cash","saved","stG","stBB","stRB","stHold","offset","rate","errM"];
+const S = {bb:0, rb:0, machine:0, style:1};
+
+/* ---------- 保存 ---------- */
+function save(){
+  const d = {counts:S};
+  NUM_IDS.forEach(k => d[k] = $(k).value);
+  try{ localStorage.setItem("jugbase", JSON.stringify(d)); }catch(e){}
+}
+function load(){
+  let d; try{ d = JSON.parse(localStorage.getItem("jugbase")||"null"); }catch(e){}
+  if(!d) return;
+  if(d.counts) Object.assign(S, d.counts);
+  NUM_IDS.forEach(k => { if(d[k] !== undefined) $(k).value = d[k]; });
+}
+
+/* ---------- 計算 ---------- */
+function num(id){ const v = parseFloat($(id).value); return isFinite(v) ? v : 0; }
+
+function compute(){
+  const m = MACHINES[S.machine];
+  const segG  = num("nowG")  - num("stG");
+  const segBB = S.bb - num("stBB");
+  const segRB = S.rb - num("stRB");
+
+  if(segG < 0)  return {err:"総回転数が開始時より小さい"};
+  if(segBB < 0) return {err:"BIGが開始時より少ない"};
+  if(segRB < 0) return {err:"REGが開始時より少ない"};
+
+  const invest = num("cash") / 1000 * num("rate") + num("saved");
+  const spent  = num("stHold") + invest - num("nowHold");
+  const net    = spent + segBB * m.bb + segRB * REG_PAY;
+  const baseG  = segG - (segBB * m.bbG + segRB * REG_G);
+
+  if(baseG <= 0) return {err:"通常時の回転数が0", detail:{segG,segBB,segRB,invest,spent,net,baseG}};
+  if(net   <= 0) return {err:"投資と持ちメダルを確認", detail:{segG,segBB,segRB,invest,spent,net,baseG}};
+
+  const e   = Math.abs(num("errM"));
+  const val = baseG / (net / 50);
+  const hi  = baseG / ((net - e) / 50);
+  const lo  = baseG / ((net + e) / 50);
+  return {val, lo, hi, baseG, net, segG, segBB, segRB, invest, spent};
+}
+
+/* ---------- 描画 ---------- */
+function table(){
+  const off = num("offset");
+  return MACHINES[S.machine].g.map(v => v + off);
+}
+
+function render(){
+  const r = compute(), t = table(), box = $("readout");
+
+  if(r.err){
+    box.classList.add("err");
+    $("big").textContent = r.err;
+    $("verdict").textContent = "";
+    $("conf").textContent = "";
+  }else{
+    box.classList.remove("err");
+    $("big").textContent = r.val.toFixed(2);
+    $("range").textContent = r.lo.toFixed(2) + " 〜 " + r.hi.toFixed(2);
+
+    const inRange = [];
+    for(let i=0;i<6;i++){
+      const a = i===0 ? -Infinity : (t[i-1]+t[i])/2;
+      const b = i===5 ?  Infinity : (t[i]+t[i+1])/2;
+      if(r.hi > a && r.lo < b) inRange.push(i+1);
+    }
+    let v;
+    if(!inRange.length)            v = "表の外";
+    else if(inRange.length === 1)  v = "設定" + inRange[0] + "相当";
+    else                           v = "設定" + inRange[0] + "〜" + inRange[inRange.length-1] + "相当";
+    $("verdict").textContent = v;
+    $("verdict").style.color = inRange.length ? "var(" + SCOL[inRange[inRange.length-1]-1] + ")" : "var(--warn)";
+
+    let c = "通常時 " + Math.round(r.baseG).toLocaleString() + "回転 / 純減 " + Math.round(r.net).toLocaleString() + "枚";
+    if(r.baseG < 1000)      c += "<br>回転数が少なすぎます。参考になりません。";
+    else if(r.baseG < 3000) c += "<br>まだ振れ幅が大きい段階です。";
+    if(inRange.length >= 4) c += "<br>絞り込めていません。合算確率と併せて判断してください。";
+    $("conf").innerHTML = c;
+  }
+
+  /* 設定ラダー */
+  const span = t[5] - t[0], pad = Math.max(span * .45, .6);
+  const min = t[0] - pad, max = t[5] + pad;
+  const pos = x => Math.max(0, Math.min(100, (x - min) / (max - min) * 100));
+
+  let h = "";
+  for(let i=5;i>=0;i--){
+    h += '<div class="row"><b>設定' + (i+1) + '</b><i>' + t[i].toFixed(2) + '</i>' +
+         '<div class="track"><span class="fill" style="width:' + pos(t[i]) + '%;background:var(' + SCOL[i] + ')"></span></div></div>';
+  }
+  if(!r.err){
+    const L = pos(r.lo), R = pos(r.hi);
+    h += '<div id="band" style="left:calc(122px + (100% - 122px) * ' + (L/100) + ');width:calc((100% - 122px) * ' + ((R-L)/100) + ')"></div>';
+    h += '<div id="bandMark" style="left:calc(122px + (100% - 122px) * ' + (L/100) + ')">▲ 測定範囲</div>';
+  }
+  $("ladder").innerHTML = h;
+
+  /* 内訳 */
+  const d = r.detail || r;
+  $("breakdown").innerHTML = r.err && !r.detail ? '<div class="meta"><span>計算できません</span><span>' + r.err + '</span></div>' :
+    [["区間の回転数", Math.round(d.segG) + " G"],
+     ["ボーナス中を除いた回転数", Math.round(d.baseG) + " G"],
+     ["区間のBIG / REG", d.segBB + " / " + d.segRB + " 回"],
+     ["投資の合計", Math.round(d.invest) + " 枚"],
+     ["区間で減った枚数", Math.round(d.spent) + " 枚"],
+     ["通常時の純減", Math.round(d.net) + " 枚"],
+     ["合算確率", (d.segBB + d.segRB) > 0 ? "1/" + (d.segG / (d.segBB + d.segRB)).toFixed(1) : "—"]
+    ].map(x => '<div class="meta"><span>' + x[0] + '</span><span>' + x[1] + '</span></div>').join("");
+}
+
+function flash(msg){
+  const f = $("flash");
+  f.textContent = msg; f.style.opacity = 1;
+  setTimeout(() => f.style.opacity = 0, 1400);
+}
+function update(){ save(); render(); }
+
+/* ---------- 初期化 ---------- */
+MACHINES.forEach((m,i) => $("machine").add(new Option(m.name, i)));
+STYLES.forEach((s,i) => $("style").add(new Option(s.name, i)));
+load();
+$("machine").value = S.machine;
+$("style").value = S.style;
+$("vBB").textContent = S.bb;
+$("vRB").textContent = S.rb;
+
+document.querySelectorAll("[data-d]").forEach(b => b.onclick = () => {
+  const [k, d] = b.dataset.d.split(",");
+  S[k] = Math.max(0, S[k] + (+d));
+  $(k === "bb" ? "vBB" : "vRB").textContent = S[k];
+  update();
+});
+document.querySelectorAll("[data-h]").forEach(b => b.onclick = () => {
+  $("nowHold").value = Math.max(0, num("nowHold") + (+b.dataset.h));
+  update();
+});
+NUM_IDS.forEach(k => $(k).addEventListener("input", update));
+
+$("machine").onchange = () => { S.machine = +$("machine").value; update(); };
+$("style").onchange = () => {
+  S.style = +$("style").value;
+  $("offset").value = STYLES[S.style].off.toFixed(2);
+  update();
+};
+$("snap").onclick = () => {
+  $("stG").value = $("nowG").value;
+  $("stBB").value = S.bb;
+  $("stRB").value = S.rb;
+  $("stHold").value = $("nowHold").value;
+  update();
+  flash("この時点から記録します");
+};
+$("reset").onclick = () => {
+  if(!confirm("入力した数値をすべて0に戻します。よろしいですか？")) return;
+  S.bb = 0; S.rb = 0;
+  $("vBB").textContent = 0; $("vRB").textContent = 0;
+  ["nowG","nowHold","cash","saved","stG","stBB","stRB","stHold"].forEach(k => $(k).value = 0);
+  update();
+  flash("0に戻しました");
+};
+
+render();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
