@@ -1,0 +1,12 @@
+{
+  "name": "ジャグラー ベース計算",
+  "short_name": "ベース計算",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12141A",
+  "theme_color": "#12141A",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
