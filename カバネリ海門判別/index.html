@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16181C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>カバネリ カウンター</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --iron:#16181C; --plate:#21242A; --plate2:#2A2E36; --edge:#3A3F49;
+  --fg:#E6E4E0; --dim:#7C8089;
+  --ember:#E8873A; --mu:#D14B42; --ik:#4FA86B;
+  --num:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--iron);color:var(--fg);font-family:var(--ui)}
+body{max-width:520px;margin:0 auto;font-size:16px;
+     padding:env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 82px)}
+button{font-family:var(--ui);color:var(--fg);background:var(--plate2);
+       border:1px solid var(--edge);border-radius:10px;cursor:pointer;font-size:16px}
+button:active{filter:brightness(1.35)}
+button:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+
+/* ---- tabs ---- */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--plate);
+      border:1px solid var(--edge);border-radius:12px;padding:4px;margin:10px 0}
+.tabs button{background:transparent;border:none;padding:13px 0;font-size:16px;
+             font-weight:600;color:var(--dim);border-radius:9px}
+.tabs button.on{background:var(--plate2);color:var(--fg);box-shadow:0 1px 0 rgba(255,255,255,.06) inset}
+
+.card{background:var(--plate);border:1px solid var(--edge);border-radius:12px;padding:14px;margin:10px 0}
+h2{font-size:11px;letter-spacing:.18em;color:var(--dim);margin:0 0 12px;font-weight:600}
+h2 span{float:right;letter-spacing:0;font-family:var(--num)}
+
+/* ---- gauge ---- */
+.gmain{display:flex;align-items:baseline;gap:6px;font-family:var(--num);font-weight:700}
+.gmain b{font-size:52px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.gmain i{font-size:19px;font-style:normal;color:var(--dim)}
+.bar{height:7px;background:#191C22;border-radius:4px;overflow:hidden;margin:11px 0 4px}
+.bar span{display:block;height:100%;background:var(--ember);border-radius:4px;transition:width .18s}
+.tot{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.tt{background:#191C22;border-radius:9px;padding:8px 4px;text-align:center}
+.tt .k{display:block;font-size:10px;letter-spacing:.08em;color:var(--dim)}
+.tt .v{display:block;font-family:var(--num);font-size:25px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.tt:nth-child(1) .v{color:var(--ember)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.sp .d{font-family:var(--num);font-size:11px;color:var(--dim);margin-top:2px;font-variant-numeric:tabular-nums}
+.sp{border-top:2px solid var(--edge);padding-top:8px}
+.sp.m{border-color:var(--mu)} .sp.i{border-color:var(--ik)}
+.sp .k{font-size:11px;letter-spacing:.1em;color:var(--dim)}
+.sp .v{font-family:var(--num);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
+
+/* ---- streak ---- */
+.streak{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.st{background:var(--plate2);border-radius:10px;padding:11px;text-align:center;border-top:3px solid var(--edge)}
+.st.m{border-color:var(--mu)} .st.i{border-color:var(--ik)}
+.st .k{font-size:11px;letter-spacing:.1em;color:var(--dim)}
+.st .v{font-family:var(--num);font-size:44px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.stb{display:grid;grid-template-columns:1fr 1.6fr;gap:6px;margin-top:8px}
+.stb button{height:46px;font-size:21px;font-weight:700;padding:0}
+.stb button:last-child{background:#33383F}
+
+/* ---- history ---- */
+.hist{margin-bottom:12px}
+.hist:last-child{margin-bottom:0}
+.hrow{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--dim);letter-spacing:.08em}
+.hrow em{font-style:normal;font-family:var(--num);font-size:15px;color:var(--fg);font-weight:700}
+.hlist{font-family:var(--num);font-size:15px;color:var(--fg);margin-top:5px;line-height:1.6;
+       word-break:break-all;font-variant-numeric:tabular-nums}
+.hlist.none{color:var(--dim)}
+.pending{color:var(--ember);font-size:12px;margin-top:8px}
+
+/* ---- plate grid (signature) ---- */
+.plates{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.plates button{height:82px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+               border-width:2px;font-weight:700}
+.plates .who{font-size:12px;letter-spacing:.16em;opacity:.85}
+.plates .act{font-size:21px;letter-spacing:.04em}
+.p-mu{border-color:var(--mu)} .p-ik{border-color:var(--ik)}
+.lit.p-mu{background:linear-gradient(180deg,#4C2C2A,#372220);color:#F2CFCC}
+.lit.p-ik{background:linear-gradient(180deg,#26402F,#1D3024);color:#CCEBD7}
+.lit .act{color:var(--ember)}
+.dark{background:#1B1E24;color:var(--dim)}
+.dark .who{opacity:.6}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(232,135,58,.55)}100%{box-shadow:0 0 0 14px rgba(232,135,58,0)}}
+.flash{animation:flash .4s ease-out}
+
+/* ---- cz buttons ---- */
+.cz{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px}
+.cz:last-child{margin-bottom:0}
+.cz button{height:56px;font-weight:700;font-size:15px}
+.cz .b-mu{border-color:var(--mu);color:#F2CFCC}
+.cz .b-ik{border-color:var(--ik);color:#CCEBD7}
+.cz .b-ok{border-color:#C9A227;color:#EFDFA8}
+.cz .b-ng{background:#1B1E24;color:var(--dim)}
+
+/* ---- tally buttons ---- */
+.tally{display:grid;gap:9px}
+.tally.c2{grid-template-columns:1fr 1fr}
+.tally.c3{grid-template-columns:1fr 1fr 1fr}
+.tally button{padding:12px 13px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left}
+.tally .k{font-size:15px;font-weight:600;line-height:1.2}
+.tally .nums{display:flex;align-items:baseline;gap:10px;font-family:var(--num);
+             font-size:25px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tally .p{color:var(--dim)}
+.tally button.hot .n{color:var(--ember)}
+
+/* ---- bottom bar ---- */
+.bottom{position:fixed;left:0;right:0;bottom:0;background:rgba(22,24,28,.94);
+        backdrop-filter:blur(12px);border-top:1px solid var(--edge);z-index:50;
+        padding:9px 12px calc(env(safe-area-inset-bottom) + 9px)}
+.binner{max-width:496px;margin:0 auto;display:grid;grid-template-columns:1fr 88px;gap:9px}
+#undo{height:50px;font-weight:600;font-size:15px}
+#undo:disabled{color:#4C5058;border-color:#2A2E36;background:#1B1E24}
+#reset{height:50px;font-size:14px;color:var(--ik);border-color:#3E2422;background:#1E1719}
+.note{font-size:12px;color:var(--dim);line-height:1.65}
+#flash{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:var(--ember);
+       color:#16181C;font-weight:700;font-size:14px;padding:9px 18px;border-radius:20px;
+       opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <button id="tab0" class="on">通常時</button>
+  <button id="tab1">ボーナス</button>
+</div>
+
+<!-- ========== 通常時 ========== -->
+<section id="pane0">
+
+  <div class="card">
+    <h2>チャンス目</h2>
+    <div class="plates">
+      <button class="p-mu lit" data-a="muHit"><span class="who">無名</span><span class="act">発光</span></button>
+      <button class="p-ik lit" data-a="ikHit"><span class="who">生駒</span><span class="act">発光</span></button>
+      <button class="p-mu dark" data-a="muMiss"><span class="who">無名</span><span class="act">非発光</span></button>
+      <button class="p-ik dark" data-a="ikMiss"><span class="who">生駒</span><span class="act">非発光</span></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>発光率</h2>
+    <div class="gmain"><b id="gAll">—</b><i>%</i></div>
+    <div class="bar"><span id="gBar" style="width:0%"></span></div>
+    <div class="tot">
+      <div class="tt"><span class="k">発光</span><span class="v" id="tHit">0</span></div>
+      <div class="tt"><span class="k">非発光</span><span class="v" id="tMiss">0</span></div>
+      <div class="tt"><span class="k">チャンス目</span><span class="v" id="tAll">0</span></div>
+    </div>
+    <div class="split">
+      <div class="sp m"><div class="k">無名</div><div class="v" id="gMu">—</div>
+        <div class="d" id="dMu">0 / 0</div></div>
+      <div class="sp i"><div class="k">生駒</div><div class="v" id="gIk">—</div>
+        <div class="d" id="dIk">0 / 0</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>現在の発光回数</h2>
+    <div class="streak">
+      <div class="st m">
+        <div class="k">無名</div><div class="v" id="sMu">0</div>
+        <div class="stb"><button data-a="muDec">−</button><button data-a="muInc">＋</button></div>
+      </div>
+      <div class="st i">
+        <div class="k">生駒</div><div class="v" id="sIk">0</div>
+        <div class="stb"><button data-a="ikDec">−</button><button data-a="ikInc">＋</button></div>
+      </div>
+    </div>
+    <p class="note" style="margin:10px 0 0">チャンス目以外で発光した時は、この＋で足してください。発光率には影響しません。</p>
+  </div>
+
+  <div class="card">
+    <h2>CZ当選</h2>
+    <div class="cz">
+      <button class="b-mu" data-a="muCZ">無名CZ 当選</button>
+      <button class="b-ik" data-a="ikCZ">生駒CZ 当選</button>
+    </div>
+    <div class="cz">
+      <button class="b-ok" data-a="ikWin">生駒CZ 成功</button>
+      <button class="b-ng" data-a="ikLose">生駒CZ 失敗</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>CZ当選までの発光回数</h2>
+    <div class="hist">
+      <div class="hrow"><span>無名CZ</span><span><em id="hMuN">0</em> 件 ／ 平均 <em id="hMuA">—</em></span></div>
+      <div class="hlist none" id="hMuL">まだ記録なし</div>
+    </div>
+    <div class="hist">
+      <div class="hrow"><span>生駒CZ</span><span><em id="hIkN">0</em> 件 ／ 平均 <em id="hIkA">—</em></span></div>
+      <div class="hlist none" id="hIkL">まだ記録なし</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>生駒CZ 成功率</h2>
+    <div class="gmain"><b id="wRate">—</b><i>%</i></div>
+    <div class="bar"><span id="wBar" style="width:0%"></span></div>
+    <div class="split">
+      <div class="sp"><div class="k">成功</div><div class="v" id="wWin">0</div></div>
+      <div class="sp"><div class="k">失敗</div><div class="v" id="wLose">0</div></div>
+    </div>
+    <div class="pending" id="wPend" hidden></div>
+  </div>
+
+</section>
+
+<!-- ========== ボーナス ========== -->
+<section id="pane1" hidden>
+
+  <div class="card">
+    <h2>ボーナス中ボイス<span id="vTot">計 0</span></h2>
+    <div class="tally c2" id="voiceBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>ボーナス中キャラ<span id="cTot">計 0</span></h2>
+    <div class="tally c3" id="charaBox"></div>
+  </div>
+
+  <div class="card">
+    <p class="note" style="margin:0">ボイスは1回のボーナスで複数回・0回のどちらもあるため、キャラの合計とは一致しません。それぞれの合計を母数として割合を出しています。</p>
+  </div>
+
+</section>
+
+<div class="bottom">
+  <div class="binner">
+    <button id="undo" disabled>取り消し</button>
+    <button id="reset">リセット</button>
+  </div>
+</div>
+<div id="flash"></div>
+
+<script>
+"use strict";
+
+const VOICE = ["男","女","景之（弱）","景之（中）","景之（強）","ボイス無し"];
+const CHARA = ["男","女","美馬"];
+
+const LABEL = {
+  muHit:"無名・発光", muMiss:"無名・非発光",
+  ikHit:"生駒・発光", ikMiss:"生駒・非発光",
+  muCZ:"無名CZ 当選", ikCZ:"生駒CZ 当選",
+  muInc:"無名 発光+1", muDec:"無名 発光−1",
+  ikInc:"生駒 発光+1", ikDec:"生駒 発光−1",
+  ikWin:"生駒CZ 成功", ikLose:"生駒CZ 失敗"
+};
+
+const blank = () => ({
+  mu:{hit:0,miss:0,streak:0,list:[]},
+  ik:{hit:0,miss:0,streak:0,list:[]},
+  win:0, lose:0,
+  voice:VOICE.map(()=>0),
+  chara:CHARA.map(()=>0)
+});
+
+let S = blank();
+let hist = [];      // {label, snap}
+let tab = 0;
+
+const $ = id => document.getElementById(id);
+const KEY = "kabaneri";
+
+/* ---------- 保存 ---------- */
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({S, hist:hist.slice(-100), tab})); }catch(e){}
+}
+function load(){
+  let d; try{ d = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  if(!d) return;
+  if(d.S){ S = Object.assign(blank(), d.S); }
+  if(Array.isArray(d.hist)) hist = d.hist;
+  if(typeof d.tab === "number") tab = d.tab;
+}
+
+/* ---------- 操作 ---------- */
+const ACT = {
+  muHit:  () => { S.mu.hit++;  S.mu.streak++; },
+  muMiss: () => { S.mu.miss++; },
+  ikHit:  () => { S.ik.hit++;  S.ik.streak++; },
+  ikMiss: () => { S.ik.miss++; },
+  muCZ:   () => { S.mu.list.push(S.mu.streak); S.mu.streak = 0; },
+  ikCZ:   () => { S.ik.list.push(S.ik.streak); S.ik.streak = 0; },
+  muInc:  () => { S.mu.streak++; },
+  muDec:  () => { S.mu.streak = Math.max(0, S.mu.streak - 1); },
+  ikInc:  () => { S.ik.streak++; },
+  ikDec:  () => { S.ik.streak = Math.max(0, S.ik.streak - 1); },
+  ikWin:  () => { S.win++; },
+  ikLose: () => { S.lose++; },
+  voice:  i => { S.voice[i]++; },
+  chara:  i => { S.chara[i]++; }
+};
+
+function act(key, arg, label){
+  hist.push({label, snap:JSON.stringify(S)});
+  if(hist.length > 100) hist.shift();
+  ACT[key](arg);
+  save(); render();
+}
+
+function undo(){
+  const h = hist.pop();
+  if(!h) return;
+  S = JSON.parse(h.snap);
+  save(); render();
+  flash("取り消しました");
+}
+
+/* ---------- 表示 ---------- */
+const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) : null;
+const show = v => v === null ? "—" : v;
+
+function render(){
+  const muN = S.mu.hit + S.mu.miss;
+  const ikN = S.ik.hit + S.ik.miss;
+  const all = pct(S.mu.hit + S.ik.hit, muN + ikN);
+
+  $("gAll").textContent = show(all);
+  $("gBar").style.width = (all === null ? 0 : all) + "%";
+  $("gMu").textContent  = show(pct(S.mu.hit, muN)) + (muN ? "%" : "");
+  $("gIk").textContent  = show(pct(S.ik.hit, ikN)) + (ikN ? "%" : "");
+  $("tHit").textContent  = S.mu.hit + S.ik.hit;
+  $("tMiss").textContent = S.mu.miss + S.ik.miss;
+  $("tAll").textContent  = muN + ikN;
+  $("dMu").textContent = S.mu.hit + " / " + muN;
+  $("dIk").textContent = S.ik.hit + " / " + ikN;
+
+  $("sMu").textContent = S.mu.streak;
+  $("sIk").textContent = S.ik.streak;
+
+  [["mu","hMu"],["ik","hIk"]].forEach(([k, p]) => {
+    const L = S[k].list;
+    $(p+"N").textContent = L.length;
+    $(p+"A").textContent = L.length ? (L.reduce((a,b)=>a+b,0) / L.length).toFixed(1) : "—";
+    const el = $(p+"L");
+    el.textContent = L.length ? L.join(", ") : "まだ記録なし";
+    el.classList.toggle("none", !L.length);
+  });
+
+  const done = S.win + S.lose;
+  const wr = pct(S.win, done);
+  $("wRate").textContent = show(wr);
+  $("wBar").style.width = (wr === null ? 0 : wr) + "%";
+  $("wWin").textContent  = S.win;
+  $("wLose").textContent = S.lose;
+  const pend = S.ik.list.length - done;
+  $("wPend").hidden = pend <= 0;
+  if(pend > 0) $("wPend").textContent = "結果未入力 " + pend + " 件";
+
+  paint("voiceBox", VOICE, S.voice, "voice");
+  paint("charaBox", CHARA, S.chara, "chara");
+  $("vTot").textContent = "計 " + S.voice.reduce((a,b)=>a+b,0);
+  $("cTot").textContent = "計 " + S.chara.reduce((a,b)=>a+b,0);
+
+  const h = hist[hist.length - 1];
+  $("undo").disabled = !h;
+  $("undo").textContent = h ? "取り消し（" + h.label + "）" : "取り消し";
+}
+
+function paint(boxId, names, arr, kind){
+  const box = $(boxId);
+  const total = arr.reduce((a,b)=>a+b,0);
+  if(box.children.length !== names.length){
+    box.innerHTML = names.map((n,i) =>
+      '<button data-k="'+kind+'" data-i="'+i+'"><span class="k">'+n+'</span>' +
+      '<span class="nums"><span class="n">0</span><span class="p">—</span></span></button>').join("");
+  }
+  names.forEach((n,i) => {
+    const b = box.children[i];
+    b.querySelector(".n").textContent = arr[i];
+    b.querySelector(".p").textContent = total ? (arr[i]/total*100).toFixed(1)+"%" : "—";
+    b.classList.toggle("hot", arr[i] > 0);
+  });
+}
+
+function flash(msg){
+  const f = $("flash");
+  f.textContent = msg; f.style.opacity = 1;
+  clearTimeout(flash.t);
+  flash.t = setTimeout(() => f.style.opacity = 0, 1200);
+}
+
+function setTab(n){
+  tab = n;
+  $("pane0").hidden = n !== 0;
+  $("pane1").hidden = n !== 1;
+  $("tab0").classList.toggle("on", n === 0);
+  $("tab1").classList.toggle("on", n === 1);
+  save();
+}
+
+/* ---------- 配線 ---------- */
+load();
+setTab(tab);
+render();
+
+document.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+  const k = b.dataset.a;
+  act(k, undefined, LABEL[k]);
+  if(k === "muHit" || k === "ikHit"){
+    b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash");
+  }
+});
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-k]");
+  if(!b) return;
+  const kind = b.dataset.k, i = +b.dataset.i;
+  act(kind, i, (kind === "voice" ? "ボイス " + VOICE[i] : "キャラ " + CHARA[i]));
+});
+
+$("tab0").onclick = () => setTab(0);
+$("tab1").onclick = () => setTab(1);
+$("undo").onclick = undo;
+$("reset").onclick = () => {
+  if(!confirm("すべての記録を消して0に戻します。よろしいですか？")) return;
+  S = blank(); hist = [];
+  save(); render();
+  flash("リセットしました");
+};
+
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
